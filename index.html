@@ -11,49 +11,47 @@
     body {
       font-family: 'Calibri', sans-serif;
       margin: 20px;
-      background-color: #ffffff;
-      color: #000000;
+      background-color: #f5f5f5;
+      color: #333;
+      font-size: 14px;
     }
     h2 {
-      color: #2196f3;
-      margin-bottom: 20px;
+      color: #666;
+      margin-bottom: 12px;
       font-weight: bold;
     }
     table {
       border-collapse: collapse;
       width: 100%;
-      margin-top: 15px;
       font-size: 12px;
-      table-layout: auto;
     }
     th, td {
-      border: 1px solid #ddd;
-      padding: 6px 8px;
+      border: 1px solid #ccc;
+      padding: 4px 6px;
       text-align: left;
-      white-space: nowrap;
     }
     th {
-      background-color: #e3f2fd;
-      color: #000;
+      background-color: #ddd;
     }
     input[type="file"] {
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     button {
-      margin: 8px 8px 0 0;
       padding: 6px 12px;
-      font-size: 14px;
-      background-color: #2196f3;
+      font-size: 12px;
+      background-color: #888;
       border: none;
       color: white;
       cursor: pointer;
       border-radius: 4px;
+      margin-right: 8px;
     }
     button:hover {
-      background-color: #1976d2;
+      background-color: #555;
     }
     label {
       font-weight: bold;
+      font-size: 12px;
     }
     #selectAllContainer {
       display: flex;
@@ -64,41 +62,46 @@
     .checkbox-container {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      background-color: #fefefe;
-      padding: 10px;
-      border: 1px solid #2196f3;
-      border-radius: 5px;
-      max-height: 80px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      margin-bottom: 10px;
+      gap: 8px;
+      margin-bottom: 8px;
     }
     .column-check-label {
       display: flex;
       align-items: center;
-      gap: 5px;
-      padding: 4px 8px;
-      background-color: #ffffff;
-      border: 1px solid #2196f3;
+      gap: 4px;
+      padding: 4px 6px;
+      background-color: #fefefe;
+      border: 1px solid #888;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 12px;
     }
     .column-check-label input[type="checkbox"] {
       transform: scale(1.1);
     }
+    .date-filter-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 10px 0;
+    }
     .date-filter-group {
       display: flex;
-      flex-wrap: wrap;
       gap: 10px;
       align-items: center;
-      margin: 14px 0;
+    }
+    .date-filter-group input[type="date"] {
+      font-size: 12px;
+      padding: 4px;
+      width: 120px;
     }
     #totalOrders {
       font-weight: bold;
-      margin: 15px 0;
-      display: inline-block;
+      margin: 10px 0;
+    }
+    .export-buttons {
+      display: flex;
+      gap: 10px;
     }
   </style>
 </head>
@@ -117,18 +120,22 @@
 <button onclick="processUploadedData()">Upload & Process</button>
 <button onclick="resetAll()">Reset / Clear</button>
 
-<div class="date-filter-group">
-  <label>From:</label>
-  <input type="date" id="fromDate">
-  <label>To:</label>
-  <input type="date" id="toDate">
-  <button onclick="renderTable()">Apply Filter</button>
-  <button onclick="clearDateFilter()">Clear Filter</button>
-</div>
+<div class="date-filter-container">
+  <div class="date-filter-group">
+    <label for="fromDate">From:</label>
+    <input type="date" id="fromDate">
+    <label for="toDate">To:</label>
+    <input type="date" id="toDate">
+    <button id="applyResetButton" onclick="renderTable()">Apply Filter</button>
+    <button onclick="clearDateFilter()">Clear Filter</button>
+  </div>
 
-<button onclick="exportToExcel()">Export to Excel</button>
-<button onclick="exportToCSV()">Export to CSV</button>
-<button onclick="exportToPDF()">Export to PDF</button>
+  <div class="export-buttons">
+    <button onclick="exportToExcel()">Export to Excel</button>
+    <button onclick="exportToCSV()">Export to CSV</button>
+    <button onclick="exportToPDF()">Export to PDF</button>
+  </div>
+</div>
 
 <div id="totalOrders"></div>
 
@@ -403,5 +410,6 @@
     renderTable();
   }
 </script>
+
 </body>
 </html>
