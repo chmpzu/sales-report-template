@@ -124,7 +124,7 @@
 <div class="checkbox-container" id="columnCheckboxes"></div>
 
 <button onclick="processUploadedData()">Upload & Process</button>
-<button onclick="resetAll()">Reset / Clear</button>
+<button onclick="clearDateFilter()">Clear Filter</button>
 
 <div class="date-filter-container">
   <div class="date-filter-group">
@@ -133,7 +133,6 @@
     <label for="toDate">To:</label>
     <input type="date" id="toDate">
     <button id="applyResetButton" onclick="renderTable()">Apply Filter</button>
-    <button onclick="clearDateFilter()">Clear Filter</button>
   </div>
 
   <div class="export-buttons">
@@ -421,15 +420,6 @@ function getFilteredRows() {
   });
 
   return rows;
-}
-
-function resetAll() {
-  masterData = {};
-  document.getElementById("fileInput").value = '';
-  document.getElementById("selectAll").checked = true;
-  document.getElementById("totalOrders").textContent = "Total Orders: 0";
-  document.getElementById("fromDate").value = "";
-  document.getElementById("toDate").value = "";
 }
 
 function clearDateFilter() {
