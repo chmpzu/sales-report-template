@@ -103,6 +103,12 @@
       display: flex;
       gap: 10px;
     }
+    .save-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px; /* Added margin for more space */
+    }
   </style>
 </head>
 <body>
@@ -156,12 +162,15 @@
       <th>Service</th>
       <th>Tracking Number</th>
       <th>PO Reference Number</th>
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
 
-<button onclick="saveChanges()">Save Changes</button>
+<div class="save-buttons">
+  <button onclick="saveChanges()">Save Changes</button>
+</div>
 
 <script>
 let masterData = {};
@@ -322,7 +331,24 @@ function createRow(data) {
     tr.appendChild(td);
   });
 
+  const actionTd = document.createElement("td");
+  const duplicateBtn = document.createElement("button");
+  duplicateBtn.textContent = "Duplicate";
+  duplicateBtn.onclick = () => duplicateRow(data, tr);
+  actionTd.appendChild(duplicateBtn);
+
+  tr.appendChild(actionTd);
+
   return tr;
+}
+
+function duplicateRow(data, tr) {
+  const newRow = { ...data }; // Copy the row data
+  newRow["Order Number"] = `${newRow["Order Number"]}-DUP`; // Add "-DUP" to the order number
+  masterData[newRow["Order Number"]] = newRow;
+
+  const newRowElement = createRow(newRow); // Create a new row in the table
+  document.querySelector("#reportTable tbody").appendChild(newRowElement);
 }
 
 function saveChanges() {
@@ -372,39 +398,35 @@ function exportToCSV() {
   a.href = url;
   a.download = "sales_report.csv";
   a.click();
-  URL.revokeObjectURL(url);
 }
 
 function exportToPDF() {
   const filteredRows = getFilteredRows();
-  const exportData = filteredRows.map(row => {
-    return headers
-      .filter(h => h !== "Actions")
-      .map(h => row[h] || "");
-  });
-  const doc = new jspdf.jsPDF();
-  doc.autoTable({
-    head: [headers.filter(h => h !== "Actions")],
-    body: exportData
-  });
+  const doc = new jsPDF();
+  const columns = headers;
+  const rows = filteredRows.map(row => columns.map(col => row[col] || ""));
+  doc.autoTable({ head: [columns], body: rows });
   doc.save("sales_report.pdf");
 }
 
 function getFilteredRows() {
   const from = document.getElementById("fromDate").value;
   const to = document.getElementById("toDate").value;
-  return Object.values(masterData).filter(row => {
+  const rows = [];
+
+  Object.entries(masterData).forEach(([key, row]) => {
     const orderDate = formatDate(row["Order Date"]);
-    return (!from || orderDate >= from) && (!to || orderDate <= to);
+    if ((from && orderDate < from) || (to && orderDate > to)) return;
+    rows.push(row);
   });
+
+  return rows;
 }
 
 function resetAll() {
   masterData = {};
-  document.querySelector("#reportTable tbody").innerHTML = "";
-  document.getElementById("columnCheckboxes").innerHTML = "";
+  document.getElementById("fileInput").value = '';
   document.getElementById("selectAll").checked = true;
-  document.getElementById("fileInput").value = "";
   document.getElementById("totalOrders").textContent = "Total Orders: 0";
   document.getElementById("fromDate").value = "";
   document.getElementById("toDate").value = "";
@@ -415,7 +437,6 @@ function clearDateFilter() {
   document.getElementById("toDate").value = "";
   renderTable();
 }
-
 </script>
 
 </body>
