@@ -156,259 +156,311 @@
       <th>Service</th>
       <th>Tracking Number</th>
       <th>PO Reference Number</th>
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
 
 <script>
-  let masterData = {};
-  const headers = [
-    "Order Date", "Ship From", "Order Number", "Item SKU", "Quantity",
-    "Custom Field 1", "Custom Field 2", "Custom Field 3", "Order Total",
-    "Recipient", "Rate", "Service", "Tracking Number", "PO Reference Number"
-  ];
-  const orderKeyAliases = ["Order Number", "Order #", "Site ID Number", "Site Order ID"];
-  let currentOrderKey = null;
+let masterData = {};
+const headers = [
+  "Order Date", "Ship From", "Order Number", "Item SKU", "Quantity",
+  "Custom Field 1", "Custom Field 2", "Custom Field 3", "Order Total",
+  "Recipient", "Rate", "Service", "Tracking Number", "PO Reference Number", "Actions"
+];
+const orderKeyAliases = ["Order Number", "Order #", "Site ID Number", "Site Order ID"];
+let currentOrderKey = null;
 
-  document.getElementById("fileInput").addEventListener("change", handleFile);
-  document.getElementById("selectAll").addEventListener("change", function () {
-    const checkboxes = document.querySelectorAll('.column-check');
-    checkboxes.forEach(cb => cb.checked = this.checked);
+document.getElementById("fileInput").addEventListener("change", handleFile);
+document.getElementById("selectAll").addEventListener("change", function () {
+  const checkboxes = document.querySelectorAll('.column-check');
+  checkboxes.forEach(cb => cb.checked = this.checked);
+});
+
+function handleFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === "pdf") {
+    readPDF(file);
+  } else {
+    readExcelCSV(file);
+  }
+}
+
+function readExcelCSV(file) {
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array", cellDates: false });
+    const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {
+      defval: "",
+      raw: false
+    });
+    setupColumnCheckboxes(Object.keys(sheet[0]), sheet);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function readPDF(file) {
+  const reader = new FileReader();
+  reader.onload = async function () {
+    const pdfData = new Uint8Array(reader.result);
+    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join('\t') + '\n';
+    }
+    const rows = text.split('\n').map(line => line.trim().split('\t').filter(cell => cell !== ''));
+    const [headerRow, ...dataRows] = rows;
+    const sheet = dataRows.map(row => {
+      const obj = {};
+      headerRow.forEach((h, i) => obj[h] = row[i] || "");
+      return obj;
+    });
+    setupColumnCheckboxes(headerRow, sheet);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setupColumnCheckboxes(columns, sheetData) {
+  window.tempSheetData = sheetData;
+  currentOrderKey = orderKeyAliases.find(key => columns.includes(key));
+  const container = document.getElementById("columnCheckboxes");
+  container.innerHTML = "";
+  headers.forEach(header => {
+    const isAvailable = columns.includes(header);
+    const wrapper = document.createElement("label");
+    wrapper.className = "column-check-label";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "column-check";
+    checkbox.value = header;
+    checkbox.checked = isAvailable;
+    checkbox.disabled = !isAvailable;
+    wrapper.appendChild(checkbox);
+    wrapper.append(header);
+    container.appendChild(wrapper);
+  });
+}
+
+function processUploadedData() {
+  if (!currentOrderKey) {
+    alert("No valid 'Order Number' column found.");
+    return;
+  }
+
+  const selectedColumns = {};
+  document.querySelectorAll(".column-check:checked").forEach(cb => {
+    selectedColumns[cb.value] = cb.value;
   });
 
-  function handleFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext === "pdf") {
-      readPDF(file);
-    } else {
-      readExcelCSV(file);
-    }
-  }
+  window.tempSheetData.forEach(row => {
+    const orderNum = row[currentOrderKey]?.toString().trim();
+    if (!orderNum) return;
 
-  function readExcelCSV(file) {
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: "array", cellDates: false });
-      const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {
-        defval: "",
-        raw: false
-      });
-      setupColumnCheckboxes(Object.keys(sheet[0]), sheet);
-    };
-    reader.readAsArrayBuffer(file);
-  }
-
-  async function readPDF(file) {
-    const reader = new FileReader();
-    reader.onload = async function () {
-      const pdfData = new Uint8Array(reader.result);
-      const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-      let text = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map(item => item.str).join('\t') + '\n';
-      }
-      const rows = text.split('\n').map(line => line.trim().split('\t').filter(cell => cell !== ''));
-      const [headerRow, ...dataRows] = rows;
-      const sheet = dataRows.map(row => {
-        const obj = {};
-        headerRow.forEach((h, i) => obj[h] = row[i] || "");
-        return obj;
-      });
-      setupColumnCheckboxes(headerRow, sheet);
-    };
-    reader.readAsArrayBuffer(file);
-  }
-
-  function setupColumnCheckboxes(columns, sheetData) {
-    window.tempSheetData = sheetData;
-    currentOrderKey = orderKeyAliases.find(key => columns.includes(key));
-    const container = document.getElementById("columnCheckboxes");
-    container.innerHTML = "";
-    headers.forEach(header => {
-      const isAvailable = columns.includes(header);
-      const wrapper = document.createElement("label");
-      wrapper.className = "column-check-label";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.className = "column-check";
-      checkbox.value = header;
-      checkbox.checked = isAvailable;
-      checkbox.disabled = !isAvailable;
-      wrapper.appendChild(checkbox);
-      wrapper.append(header);
-      container.appendChild(wrapper);
-    });
-  }
-
-  function processUploadedData() {
-    if (!currentOrderKey) {
-      alert("No valid 'Order Number' column found.");
-      return;
+    if (!masterData[orderNum]) {
+      masterData[orderNum] = {};
+      headers.forEach(h => masterData[orderNum][h] = "");
+      masterData[orderNum]["Order Number"] = orderNum;
     }
 
-    const selectedColumns = {};
-    document.querySelectorAll(".column-check:checked").forEach(cb => {
-      selectedColumns[cb.value] = cb.value;
-    });
+    for (let field in selectedColumns) {
+      let incomingValue = row[field]?.toString().trim();
 
-    window.tempSheetData.forEach(row => {
-      const orderNum = row[currentOrderKey]?.toString().trim();
-      if (!orderNum) return;
-
-      if (!masterData[orderNum]) {
-        masterData[orderNum] = {};
-        headers.forEach(h => masterData[orderNum][h] = "");
-        masterData[orderNum]["Order Number"] = orderNum;
+      if (field === "Item SKU" && !incomingValue) {
+        incomingValue = row["SKU"]?.toString().trim() || "";
       }
 
-      for (let field in selectedColumns) {
-        let incomingValue = row[field]?.toString().trim();
-
-        if (field === "Item SKU" && !incomingValue) {
-          incomingValue = row["SKU"]?.toString().trim() || "";
-        }
-
-        if (field === "Recipient" && !incomingValue) {
-          const first = row["Shipping First Name"] || "";
-          const last = row["Shipping Last Name"] || "";
-          incomingValue = `${first} ${last}`.trim();
-        }
-
-        if (incomingValue && !masterData[orderNum][field]) {
-          masterData[orderNum][field] = incomingValue;
-        }
+      if (field === "Recipient" && !incomingValue) {
+        const first = row["Shipping First Name"] || "";
+        const last = row["Shipping Last Name"] || "";
+        incomingValue = `${first} ${last}`.trim();
       }
-    });
 
+      if (incomingValue && !masterData[orderNum][field]) {
+        masterData[orderNum][field] = incomingValue;
+      }
+    }
+  });
+
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.querySelector("#reportTable tbody");
+  const totalDisplay = document.getElementById("totalOrders");
+  tbody.innerHTML = "";
+
+  const from = document.getElementById("fromDate").value;
+  const to = document.getElementById("toDate").value;
+  let totalCount = 0;
+
+  Object.entries(masterData).forEach(([key, row]) => {
+    const orderDate = formatDate(row["Order Date"]);
+    if ((from && orderDate < from) || (to && orderDate > to)) return;
+
+    const tr = createRow(row, false);
+    tbody.appendChild(tr);
+    totalCount++;
+
+    if (row._isDuplicate) {
+      const dupTr = createRow(row, true);
+      tbody.appendChild(dupTr);
+    }
+  });
+
+  totalDisplay.textContent = `Total Orders: ${totalCount}`;
+}
+
+function createRow(data, isDuplicate) {
+  const tr = document.createElement("tr");
+  if (isDuplicate) tr.style.backgroundColor = "#ffd4d4";
+
+  headers.forEach(header => {
+    if (header === "Actions") return;
+    const td = document.createElement("td");
+    td.contentEditable = true;
+    td.textContent = header === "Order Date" ? formatDate(data[header]) : data[header] || "";
+    tr.appendChild(td);
+  });
+
+  const actionTd = document.createElement("td");
+  actionTd.style.whiteSpace = "nowrap";
+
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "Edit";
+  editBtn.onclick = () => toggleEditMode(tr, editBtn);
+  actionTd.appendChild(editBtn);
+
+  const dupBtn = document.createElement("button");
+  dupBtn.textContent = "Duplicate";
+  dupBtn.onclick = () => duplicateRow(data);
+  actionTd.appendChild(dupBtn);
+
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "Delete";
+  delBtn.onclick = () => {
+    delete masterData[data["Order Number"]];
     renderTable();
-  }
+  };
+  actionTd.appendChild(delBtn);
 
-  function renderTable() {
-    const tbody = document.querySelector("#reportTable tbody");
-    const totalDisplay = document.getElementById("totalOrders");
-    tbody.innerHTML = "";
+  tr.appendChild(actionTd);
+  return tr;
+}
 
-    const from = document.getElementById("fromDate").value;
-    const to = document.getElementById("toDate").value;
+function toggleEditMode(tr, editBtn) {
+  const saveBtn = document.createElement("button");
+  saveBtn.textContent = "Save";
+  saveBtn.onclick = () => saveRow(tr);
 
-    let totalCount = 0;
+  tr.querySelector("td:last-child").innerHTML = "";
+  tr.querySelector("td:last-child").appendChild(saveBtn);
+  editBtn.remove();
+}
 
-    Object.values(masterData).forEach(row => {
-      const orderDate = formatDate(row["Order Date"]);
-      if ((from && orderDate < from) || (to && orderDate > to)) return;
+function duplicateRow(rowData) {
+  const copy = { ...rowData };
+  copy["Order Number"] += "-DUP";
+  copy._isDuplicate = true;
+  masterData[copy["Order Number"]] = copy;
+  renderTable();
+}
 
-      const tr = document.createElement("tr");
-      headers.forEach(header => {
-        const td = document.createElement("td");
-        let content = header === "Order Date" ? orderDate : (row[header] || "");
-        if (header === "Order Total") content = content.replace(/[^0-9.]/g, '');
-        td.textContent = content;
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-      totalCount++;
-    });
+function saveRow(tr) {
+  const tds = tr.querySelectorAll("td");
+  const newData = {};
+  headers.forEach((h, i) => {
+    if (h === "Actions") return;
+    newData[h] = tds[i].textContent.trim();
+  });
+  newData["Order Number"] = newData["Order Number"].replace("-DUP", "");
+  masterData[newData["Order Number"]] = newData;
+  renderTable();
+}
 
-    totalDisplay.textContent = `Total Orders: ${totalCount}`;
-  }
+function formatDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  return !isNaN(d) ? d.toISOString().split("T")[0] : value;
+}
 
-  function formatDate(value) {
-    if (!value) return "";
-    const d = new Date(value);
-    return !isNaN(d) ? d.toISOString().split("T")[0] : value;
-  }
+function exportToExcel() {
+  const filteredRows = getFilteredRows();
+  const exportData = filteredRows.map(row => {
+    const newRow = { ...row };
+    delete newRow["Actions"];
+    return newRow;
+  });
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sales Report");
+  XLSX.writeFile(workbook, "sales_report.xlsx");
+}
 
-  function exportToExcel() {
-    const rows = [headers];
-    const from = document.getElementById("fromDate").value;
-    const to = document.getElementById("toDate").value;
-    Object.values(masterData).forEach(row => {
-      const orderDate = formatDate(row["Order Date"]);
-      if ((from && orderDate < from) || (to && orderDate > to)) return;
-      rows.push(headers.map(h => {
-        let val = row[h] || "";
-        if (h === "Order Date") return orderDate;
-        if (h === "Order Total") return val.replace(/[^0-9.]/g, '');
-        return val;
-      }));
-    });
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
-    XLSX.writeFile(wb, "Sales_Report.xlsx");
-  }
+function exportToCSV() {
+  const filteredRows = getFilteredRows();
+  const exportData = filteredRows.map(row => {
+    const newRow = { ...row };
+    delete newRow["Actions"];
+    return newRow;
+  });
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const csv = XLSX.utils.sheet_to_csv(worksheet);
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "sales_report.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-  function exportToCSV() {
-    const rows = [headers];
-    const from = document.getElementById("fromDate").value;
-    const to = document.getElementById("toDate").value;
-    Object.values(masterData).forEach(row => {
-      const orderDate = formatDate(row["Order Date"]);
-      if ((from && orderDate < from) || (to && orderDate > to)) return;
-      rows.push(headers.map(h => {
-        let val = row[h] || "";
-        if (h === "Order Date") return orderDate;
-        if (h === "Order Total") return val.replace(/[^0-9.]/g, '');
-        return val;
-      }));
-    });
-    const csvContent = rows.map(e => e.map(v => `"${v}"`).join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "Sales_Report.csv");
-    link.click();
-  }
+function exportToPDF() {
+  const filteredRows = getFilteredRows();
+  const exportData = filteredRows.map(row => {
+    return headers
+      .filter(h => h !== "Actions")
+      .map(h => row[h] || "");
+  });
+  const doc = new jspdf.jsPDF();
+  doc.autoTable({
+    head: [headers.filter(h => h !== "Actions")],
+    body: exportData
+  });
+  doc.save("sales_report.pdf");
+}
 
-  function exportToPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const from = document.getElementById("fromDate").value;
-    const to = document.getElementById("toDate").value;
-    const data = Object.values(masterData)
-      .filter(row => {
-        const orderDate = formatDate(row["Order Date"]);
-        return (!from || orderDate >= from) && (!to || orderDate <= to);
-      })
-      .map(row => headers.map(h => {
-        if (h === "Order Date") return formatDate(row[h]);
-        if (h === "Order Total") return (row[h] || "").replace(/[^0-9.]/g, '');
-        return row[h] || "";
-      }));
-    doc.autoTable({
-      head: [headers],
-      body: data,
-      startY: 10,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [33, 150, 243] }
-    });
-    doc.save("Sales_Report.pdf");
-  }
+function getFilteredRows() {
+  const from = document.getElementById("fromDate").value;
+  const to = document.getElementById("toDate").value;
+  return Object.values(masterData).filter(row => {
+    const orderDate = formatDate(row["Order Date"]);
+    return (!from || orderDate >= from) && (!to || orderDate <= to);
+  });
+}
 
-  function resetAll() {
-    masterData = {};
-    document.querySelector("#reportTable tbody").innerHTML = "";
-    document.getElementById("columnCheckboxes").innerHTML = "";
-    document.getElementById("selectAll").checked = true;
-    document.getElementById("fileInput").value = "";
-    document.getElementById("fromDate").value = "";
-    document.getElementById("toDate").value = "";
-    document.getElementById("totalOrders").textContent = "";
-    currentOrderKey = null;
-  }
+function resetAll() {
+  masterData = {};
+  document.querySelector("#reportTable tbody").innerHTML = "";
+  document.getElementById("columnCheckboxes").innerHTML = "";
+  document.getElementById("selectAll").checked = true;
+  document.getElementById("fileInput").value = "";
+  document.getElementById("fromDate").value = "";
+  document.getElementById("toDate").value = "";
+  document.getElementById("totalOrders").textContent = "";
+  currentOrderKey = null;
+}
 
-  function clearDateFilter() {
-    document.getElementById("fromDate").value = "";
-    document.getElementById("toDate").value = "";
-    renderTable();
-  }
+function clearDateFilter() {
+  document.getElementById("fromDate").value = "";
+  document.getElementById("toDate").value = "";
+  renderTable();
+}
 </script>
 
 </body>
