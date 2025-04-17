@@ -156,18 +156,19 @@
       <th>Service</th>
       <th>Tracking Number</th>
       <th>PO Reference Number</th>
-      <th>Actions</th>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
+
+<button onclick="saveChanges()">Save Changes</button>
 
 <script>
 let masterData = {};
 const headers = [
   "Order Date", "Ship From", "Order Number", "Item SKU", "Quantity",
   "Custom Field 1", "Custom Field 2", "Custom Field 3", "Order Total",
-  "Recipient", "Rate", "Service", "Tracking Number", "PO Reference Number", "Actions"
+  "Recipient", "Rate", "Service", "Tracking Number", "PO Reference Number"
 ];
 const orderKeyAliases = ["Order Number", "Order #", "Site ID Number", "Site Order ID"];
 let currentOrderKey = null;
@@ -303,84 +304,40 @@ function renderTable() {
     const orderDate = formatDate(row["Order Date"]);
     if ((from && orderDate < from) || (to && orderDate > to)) return;
 
-    const tr = createRow(row, false);
+    const tr = createRow(row);
     tbody.appendChild(tr);
     totalCount++;
-
-    if (row._isDuplicate) {
-      const dupTr = createRow(row, true);
-      tbody.appendChild(dupTr);
-    }
   });
 
   totalDisplay.textContent = `Total Orders: ${totalCount}`;
 }
 
-function createRow(data, isDuplicate) {
+function createRow(data) {
   const tr = document.createElement("tr");
-  if (isDuplicate) tr.style.backgroundColor = "#ffd4d4";
 
   headers.forEach(header => {
-    if (header === "Actions") return;
     const td = document.createElement("td");
     td.contentEditable = true;
     td.textContent = header === "Order Date" ? formatDate(data[header]) : data[header] || "";
     tr.appendChild(td);
   });
 
-  const actionTd = document.createElement("td");
-  actionTd.style.whiteSpace = "nowrap";
-
-  const editBtn = document.createElement("button");
-  editBtn.textContent = "Edit";
-  editBtn.onclick = () => toggleEditMode(tr, editBtn);
-  actionTd.appendChild(editBtn);
-
-  const dupBtn = document.createElement("button");
-  dupBtn.textContent = "Duplicate";
-  dupBtn.onclick = () => duplicateRow(data);
-  actionTd.appendChild(dupBtn);
-
-  const delBtn = document.createElement("button");
-  delBtn.textContent = "Delete";
-  delBtn.onclick = () => {
-    delete masterData[data["Order Number"]];
-    renderTable();
-  };
-  actionTd.appendChild(delBtn);
-
-  tr.appendChild(actionTd);
   return tr;
 }
 
-function toggleEditMode(tr, editBtn) {
-  const saveBtn = document.createElement("button");
-  saveBtn.textContent = "Save";
-  saveBtn.onclick = () => saveRow(tr);
-
-  tr.querySelector("td:last-child").innerHTML = "";
-  tr.querySelector("td:last-child").appendChild(saveBtn);
-  editBtn.remove();
-}
-
-function duplicateRow(rowData) {
-  const copy = { ...rowData };
-  copy["Order Number"] += "-DUP";
-  copy._isDuplicate = true;
-  masterData[copy["Order Number"]] = copy;
-  renderTable();
-}
-
-function saveRow(tr) {
-  const tds = tr.querySelectorAll("td");
-  const newData = {};
-  headers.forEach((h, i) => {
-    if (h === "Actions") return;
-    newData[h] = tds[i].textContent.trim();
+function saveChanges() {
+  const rows = document.querySelectorAll("#reportTable tbody tr");
+  rows.forEach(row => {
+    const tds = row.querySelectorAll("td");
+    const newData = {};
+    headers.forEach((h, i) => {
+      newData[h] = tds[i].textContent.trim();
+    });
+    newData["Order Number"] = newData["Order Number"].replace("-DUP", "");
+    masterData[newData["Order Number"]] = newData;
   });
-  newData["Order Number"] = newData["Order Number"].replace("-DUP", "");
-  masterData[newData["Order Number"]] = newData;
-  renderTable();
+
+  alert("Changes saved successfully!");
 }
 
 function formatDate(value) {
@@ -393,7 +350,6 @@ function exportToExcel() {
   const filteredRows = getFilteredRows();
   const exportData = filteredRows.map(row => {
     const newRow = { ...row };
-    delete newRow["Actions"];
     return newRow;
   });
   const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -406,7 +362,6 @@ function exportToCSV() {
   const filteredRows = getFilteredRows();
   const exportData = filteredRows.map(row => {
     const newRow = { ...row };
-    delete newRow["Actions"];
     return newRow;
   });
   const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -450,10 +405,9 @@ function resetAll() {
   document.getElementById("columnCheckboxes").innerHTML = "";
   document.getElementById("selectAll").checked = true;
   document.getElementById("fileInput").value = "";
+  document.getElementById("totalOrders").textContent = "Total Orders: 0";
   document.getElementById("fromDate").value = "";
   document.getElementById("toDate").value = "";
-  document.getElementById("totalOrders").textContent = "";
-  currentOrderKey = null;
 }
 
 function clearDateFilter() {
@@ -461,6 +415,7 @@ function clearDateFilter() {
   document.getElementById("toDate").value = "";
   renderTable();
 }
+
 </script>
 
 </body>
